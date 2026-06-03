@@ -70,13 +70,18 @@ def classify_customers(customers: list[dict], config: dict) -> list[dict]:
     client = anthropic.Anthropic(api_key=api_key)
 
     message = client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-opus-4-5",
         max_tokens=2048,
         messages=[{"role": "user", "content": build_user_message(customers)}],
         system=build_system_prompt(config),
     )
 
     raw = message.content[0].text.strip()
+
+    # Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[-1]          # drop opening fence line
+        raw = raw.rsplit("```", 1)[0].strip()  # drop closing fence
 
     try:
         results = json.loads(raw)
