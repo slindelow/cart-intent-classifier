@@ -1,0 +1,27 @@
+{
+  "intents": {
+    "price_sensitive": {
+      "description": "Customer is deterred by price. High discount usage history, cart value significantly above their AOV, or signals of comparison shopping.",
+      "klaviyo_flow": "Abandoned Cart — Discount Offer",
+      "flow_logic": "Send 15% off code, expires in 24 hours. Subject line leads with the offer. Single email, no follow-up if redeemed."
+    },
+    "trust_gap": {
+      "description": "Customer wants to buy but lacks confidence. First-time buyers with high cart value, or anyone who visited return/shipping policy pages before dropping off.",
+      "klaviyo_flow": "Abandoned Cart — Confidence Builder",
+      "flow_logic": "Lead with social proof (reviews, ratings). Highlight free returns, money-back guarantee, and secure checkout. 2-email sequence: trust signals first, then gentle cart reminder."
+    },
+    "distracted": {
+      "description": "Customer intended to buy but got pulled away. Returning customer, normal cart value, short session, no policy visits. Low friction abandonment.",
+      "klaviyo_flow": "Abandoned Cart — Simple Reminder",
+      "flow_logic": "Clean, minimal cart summary. No discount, no pressure. Single email within 1 hour of abandonment. Subject: 'You left something behind.'"
+    },
+    "research_phase": {
+      "description": "Customer is still evaluating. Multiple product views, items added and removed from cart, low email engagement, longer decision window.",
+      "klaviyo_flow": "Abandoned Cart — Education",
+      "flow_logic": "Lead with product benefits and differentiators. Include FAQ, comparison vs. alternatives, and customer use cases. 3-email sequence over 5 days — give them time."
+    }
+  },
+  "confidence_threshold": 0.70,
+  "fallback_intent": "distracted",
+  "brand_context": "Mid-sized DTC Shopify brand. Products are considered purchases ($80-$300 range). Customers are value-conscious but not purely price-driven."
+}
