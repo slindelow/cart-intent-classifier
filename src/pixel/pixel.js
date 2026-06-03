@@ -20,6 +20,10 @@ let checkoutStartTime = null;
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function sendEvent(event, extra = {}) {
+  // Don't send events before we have a session ID — the server requires it
+  // and there's nothing useful to correlate without it.
+  if (!sessionId) return;
+
   const payload = {
     session_id: sessionId,
     customer_id: customerId,

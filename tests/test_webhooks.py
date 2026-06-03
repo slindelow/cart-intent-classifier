@@ -115,6 +115,7 @@ class TestSessionEvent:
         })
         from src.api.main import session_get
         session = session_get(session_id)
+        assert session is not None
         assert session.get("visited_return_policy") is True
 
     def test_cart_removal_increments_counter(self):
@@ -128,6 +129,7 @@ class TestSessionEvent:
             })
         from src.api.main import session_get
         session = session_get(session_id)
+        assert session is not None
         assert session.get("items_added_and_removed") == 2
 
     def test_converted_session_is_flagged(self):
@@ -139,7 +141,12 @@ class TestSessionEvent:
         })
         from src.api.main import session_get
         session = session_get(session_id)
+        assert session is not None
         assert session.get("converted") is True
+
+    def test_missing_session_returns_none(self):
+        from src.api.main import session_get
+        assert session_get("nonexistent_session_xyz") is None
 
 
 # ── Cart abandoned endpoint ───────────────────────────────────────────────────

@@ -10,6 +10,7 @@ Endpoints:
 Deploy on Railway. Register Shopify webhooks pointing at your Railway URL.
 """
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -67,12 +68,13 @@ def get_redis() -> redis.Redis | None:
 _memory_store: dict[str, dict] = {}  # fallback for local dev
 
 
-def session_get(session_id: str) -> dict:
+def session_get(session_id: str) -> dict | None:
+    """Returns the session dict, or None if it does not exist."""
     r = get_redis()
     if r:
         raw = r.get(f"session:{session_id}")
-        return json.loads(raw) if raw else {}
-    return _memory_store.get(session_id, {})
+        return json.loads(raw) if raw is not None else None
+    return _memory_store.get(session_id, None)
 
 
 def session_set(session_id: str, data: dict) -> None:
@@ -138,7 +140,8 @@ async def receive_session_event(request: Request):
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id required")
 
-    session = session_get(session_id) or {
+    existing = session_get(session_id)
+    session = existing if existing is not None else {
         "customer_id": body.get("customer_id"),
         "visited_return_policy": False,
         "visited_shipping_info": False,
@@ -199,6 +202,17 @@ async def cart_abandoned(request: Request, background_tasks: BackgroundTasks):
     cart_value    = float(payload.get("total_price", 0))
     cart_items    = [item.get("title", "") for item in payload.get("line_items", [])]
 
+    # Deduplication — Shopify uses at-least-once delivery; guard against
+    # double-classification if the same webhook fires more than once.
+    dedup_key = f"dedup:{session_id}"
+    r = get_redis()
+    if r:
+        if r.get(dedup_key):
+            logger.info(f"Duplicate webhook ignored for session {session_id}")
+            return JSONResponse({"status": "duplicate"}, status_code=200)
+        r.setex(dedup_key, SESSION_TTL_SECONDS, "1")
+    # Note: without Redis, deduplication is best-effort (memory store is per-instance)
+
     logger.info(f"Cart abandoned — customer_id={customer_id} value={cart_value}")
 
     background_tasks.add_task(
@@ -241,15 +255,18 @@ async def run_classification(
         shopify_data = None
         klaviyo_data = None
 
+        # Run synchronous HTTP calls in a thread pool so we don't block
+        # the event loop. build_shopify_profile and enrich_profile both
+        # use the `requests` library which is synchronous.
         if customer_id:
             try:
-                shopify_data = build_shopify_profile(customer_id)
+                shopify_data = await asyncio.to_thread(build_shopify_profile, customer_id)
             except Exception as e:
                 logger.warning(f"Shopify fetch failed for {customer_id}: {e}")
 
         if customer_email:
             try:
-                enriched = enrich_profile({}, customer_email)
+                enriched = await asyncio.to_thread(enrich_profile, {}, customer_email)
                 klaviyo_data = {
                     "email_open_rate": enriched.get("email_open_rate"),
                     "profile_id": enriched.get("_klaviyo_profile_id"),
@@ -274,8 +291,8 @@ async def run_classification(
         )
         log_profile_quality(profile)
 
-        # 4. Classify
-        result = classify_single(profile, CONFIG)
+        # 4. Classify (Claude API call — also synchronous, run in thread)
+        result = await asyncio.to_thread(classify_single, profile, CONFIG)
         logger.info(
             f"Classified {customer_id}: intent={result['intent']} "
             f"confidence={result['confidence']:.2f}"
@@ -283,7 +300,9 @@ async def run_classification(
 
         # 5. Write back to Klaviyo
         if profile.get("_klaviyo_profile_id"):
-            write_classification_result(profile, result["intent"], result["klaviyo_flow"])
+            await asyncio.to_thread(
+                write_classification_result, profile, result["intent"], result["klaviyo_flow"]
+            )
             logger.info(f"Klaviyo updated for profile {profile['_klaviyo_profile_id']}")
 
         # 6. Clean up session

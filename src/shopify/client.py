@@ -29,7 +29,7 @@ def _base_url() -> str:
     store = os.getenv("SHOPIFY_STORE_URL")
     if not store:
         raise EnvironmentError("SHOPIFY_STORE_URL not set.")
-    return f"https://{store}/admin/api/2024-01"
+    return f"https://{store}/admin/api/2025-04"
 
 
 # ── Customer ─────────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ def get_order_history(customer_id: str, limit: int = 50) -> list[dict]:
     url = f"{_base_url()}/orders.json"
     params = {
         "customer_id": customer_id,
-        "limit": limit,
+        "limit": 250,  # Shopify max — ensures we don't miss orders for loyal customers
         "status": "any",
         "fields": "id,total_price,discount_codes,created_at,financial_status",
     }
@@ -91,6 +91,9 @@ def build_shopify_profile(customer_id: str) -> dict:
     # Customer type
     customer_type = "returning" if purchase_count > 0 else "first_time"
 
+    # Only return fields this client actually knows about.
+    # cart_value, cart_items, session signals, and email_open_rate are
+    # added by profile_builder.py from their respective sources.
     return {
         "customer_id": str(customer_id),
         "customer_type": customer_type,
@@ -98,12 +101,4 @@ def build_shopify_profile(customer_id: str) -> dict:
         "avg_order_value": avg_order_value,
         "discount_usage_rate": discount_usage_rate,
         "days_since_last_purchase": days_since_last_purchase,
-        # Fields below populated by Klaviyo client and session store
-        "email_open_rate": None,
-        "cart_value": None,
-        "cart_items": [],
-        "visited_return_policy": False,
-        "visited_shipping_info": False,
-        "time_on_checkout_seconds": None,
-        "items_added_and_removed": 0,
     }

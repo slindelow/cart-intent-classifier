@@ -107,18 +107,30 @@ def build_profile(
 
 def log_profile_quality(profile: dict[str, Any]) -> None:
     """
-    Log a quick quality summary for a profile — useful for debugging
-    classification accuracy.
+    Log a quality summary showing which signals came from real data sources
+    vs. defaults. Useful for diagnosing classification accuracy.
+
+    A signal "has real data" means it was actually populated by a source,
+    not just left at a default value (0, False, 0.0, None).
     """
-    signals_present = sum([
-        profile.get("purchase_count") is not None,
-        profile.get("avg_order_value") is not None,
-        profile.get("discount_usage_rate") is not None,
-        profile.get("email_open_rate") is not None,
-        profile.get("time_on_checkout_seconds") is not None,
-        profile.get("visited_return_policy") is not None,
-        profile.get("items_added_and_removed") is not None,
-    ])
+    # These fields have real data only when populated by their source.
+    # Defaults are: purchase_count=0 (ambiguous), avg_order_value=None,
+    # discount_usage_rate=0.0 (ambiguous), email_open_rate=None,
+    # time_on_checkout_seconds=None, visited_return_policy=False (ambiguous)
+    real_signals = {
+        "purchase_history":     profile.get("avg_order_value") is not None,
+        "discount_pattern":     profile.get("purchase_count", 0) > 0,
+        "email_engagement":     profile.get("email_open_rate") is not None,
+        "checkout_time":        profile.get("time_on_checkout_seconds") is not None,
+        "policy_page_visits":   profile.get("visited_return_policy") is True
+                                or profile.get("visited_shipping_info") is True,
+        "cart_indecision":      profile.get("items_added_and_removed", 0) > 0,
+        "lapsed_signal":        profile.get("days_since_last_purchase") is not None,
+    }
+    present = sum(real_signals.values())
+    missing = [k for k, v in real_signals.items() if not v]
+
     logger.info(
-        f"[{profile['customer_id']}] Profile quality: {signals_present}/7 signals present"
+        f"[{profile['customer_id']}] Profile quality: {present}/7 signals present"
+        + (f" — missing: {', '.join(missing)}" if missing else "")
     )

@@ -69,9 +69,12 @@ def classify_customers(customers: list[dict], config: dict) -> list[dict]:
 
     client = anthropic.Anthropic(api_key=api_key)
 
+    # ~150 tokens per customer result; floor at 1024, cap at 8192
+    max_tokens = max(1024, min(len(customers) * 150 + 256, 8192))
+
     message = client.messages.create(
         model="claude-opus-4-5",
-        max_tokens=2048,
+        max_tokens=max_tokens,
         messages=[{"role": "user", "content": build_user_message(customers)}],
         system=build_system_prompt(config),
     )

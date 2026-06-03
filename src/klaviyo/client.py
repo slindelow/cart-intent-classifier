@@ -14,7 +14,7 @@ import requests
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
 KLAVIYO_BASE = "https://a.klaviyo.com/api"
-API_VERSION = "2023-10-15"
+API_VERSION = "2024-10-15"
 
 
 def _headers() -> dict:
@@ -106,9 +106,9 @@ def write_classification_result(profile: dict, intent: str, flow_name: str) -> N
     """
     Write the classification result back to Klaviyo so the flow can trigger.
 
-    Sets two properties on the profile:
-        abandoned_cart_intent       = "trust_gap"
-        abandoned_cart_flow         = "Abandoned Cart — Confidence Builder"
+    Sets both properties in a single PATCH request:
+        abandoned_cart_intent  = "trust_gap"
+        abandoned_cart_flow    = "Abandoned Cart — Confidence Builder"
 
     The Klaviyo flows should be configured to trigger on
     the abandoned_cart_intent property value.
@@ -117,5 +117,18 @@ def write_classification_result(profile: dict, intent: str, flow_name: str) -> N
     if not profile_id:
         raise ValueError("No Klaviyo profile ID on this profile. Run enrich_profile() first.")
 
-    update_profile_property(profile_id, "abandoned_cart_intent", intent)
-    update_profile_property(profile_id, "abandoned_cart_flow", flow_name)
+    url = f"{KLAVIYO_BASE}/profiles/{profile_id}/"
+    payload = {
+        "data": {
+            "type": "profile",
+            "id": profile_id,
+            "attributes": {
+                "properties": {
+                    "abandoned_cart_intent": intent,
+                    "abandoned_cart_flow": flow_name,
+                }
+            }
+        }
+    }
+    resp = requests.patch(url, headers=_headers(), json=payload)
+    resp.raise_for_status()
