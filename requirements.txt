@@ -1,2 +1,16 @@
+# Core
 anthropic>=0.25.0
 python-dotenv>=1.0.0
+
+# API (Phase 2+)
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+requests>=2.31.0
+
+# Database (Phase 5)
+psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.0
+
+# Job queue (Phase 5)
+redis>=5.0.0
+celery>=5.3.0
